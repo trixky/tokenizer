@@ -1,0 +1,2 @@
+- c'est l'initiateur qui paye les fees, pour transfer ET transferFrom
+- 

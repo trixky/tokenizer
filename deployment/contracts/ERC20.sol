@@ -1,14 +1,19 @@
-pragma solidity ^0.8.28;
+pragma solidity >=0.8.4;
 
 import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import {IERC20Metadata} from "@openzeppelin/contracts/token/ERC20/extensions/IERC20Metadata.sol";
 import {IERC20Errors} from "@openzeppelin/contracts/interfaces/draft-IERC6093.sol";
 
+// https://github.com/OpenZeppelin/openzeppelin-contracts-upgradeable/blob/master/docs/modules/ROOT/pages/erc20.adoc
+// https://github.com/binodnp/openzeppelin-solidity/blob/master/contracts/token/ERC20/ERC20.sol
+// https://github.com/OpenZeppelin/openzeppelin-contracts/blob/master/contracts/token/ERC20/ERC20.sol
+
 abstract contract ERC20 is IERC20, IERC20Metadata, IERC20Errors {
-    mapping(address account => uint256) private _balances;
+    mapping(address account => uint256) internal _balances;
     mapping(address account => mapping(address spender => uint256)) private _allowances;
 
-    uint256 private _totalSupply;
+    uint256 internal _totalSupply;
+
 
     string private _name;
     string private _symbol;
@@ -18,10 +23,9 @@ abstract contract ERC20 is IERC20, IERC20Metadata, IERC20Errors {
         _symbol = symbol_;
     }
 
-
     // -------------------------------- IERC20 implementation --------------------------------
     // -------------------------------- internal
-    function _update(address from, address to, uint256 value) internal {
+    function _update(address from, address to, uint256 value) internal virtual {
         if (from == address(0)) {
             _totalSupply += value;
         } else {
@@ -129,6 +133,4 @@ abstract contract ERC20 is IERC20, IERC20Metadata, IERC20Errors {
     function decimals() public view virtual returns(uint8) {
         return 18;
     }
-
-    // -------------------------------- IERC20Errors implementation --------------------------------
 }
