@@ -2,20 +2,9 @@ import {
     loadFixture,
 } from "@nomicfoundation/hardhat-toolbox/network-helpers";
 import { expect } from "chai";
-import { deployFeesFixture, MINIMUM_SIGNATURES } from "./main";
+import { deployFeesFixture, generateFees, MINIMUM_SIGNATURES, toInternalUnits } from "./main";
 
-// Helper function to convert user units to internal units
-async function toInternalUnits(fees: any, userValue: bigint): Promise<bigint> {
-    const decimals = await fees.decimals();
-    return userValue * BigInt(10) ** decimals;
-}
 
-// Helper function to generate fees for testing
-async function generateFees(fees: any, owner: any, account1: any, amount: bigint = 100n): Promise<void> {
-    const largeAmount = toInternalUnits(fees, 1000n);
-    await fees.transfer(account1.address, largeAmount);
-    await fees.connect(account1).transfer(owner.address, toInternalUnits(fees, amount));
-}
 
 describe("Governance", function () {
     // --------------------------------- Admin Management
@@ -903,8 +892,7 @@ describe("Governance", function () {
             // Verify execution status
             expect(proposal.signatureCount).to.equal(1);
             expect(proposal.to).to.equal(account1.address);
-            const decimals = await fees.decimals();
-            expect(proposal.value).to.equal(100n * BigInt(10) ** decimals);
+            expect(proposal.value).to.equal(await toInternalUnits(fees, 100n));
             expect(proposal.minimumSignatures).to.equal(MINIMUM_SIGNATURES);
             expect(proposal.executed).to.equal(true);
             expect(proposal.cancelledBy).to.equal("0x0000000000000000000000000000000000000000");

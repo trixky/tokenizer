@@ -26,6 +26,6 @@ module.exports = {
     ]
   },
   sourcify: {
-    enabled: true // active la vérification Sourcify en plus
+    enabled: true
   }
 };

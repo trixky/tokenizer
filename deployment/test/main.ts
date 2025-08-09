@@ -6,6 +6,19 @@ export const SYMBOL = "TKWF";
 export const PERCENTAGE_FEES = 10;
 export const MINIMUM_SIGNATURES = 1;
 
+// Helper function to convert user units to internal units
+export async function toInternalUnits(fees: any, userValue: bigint): Promise<bigint> {
+    const decimals = await fees.decimals();
+    return userValue * BigInt(10) ** decimals;
+}
+
+// Helper function to generate fees for testing
+export async function generateFees(fees: any, owner: any, account1: any, amount: bigint = 100n): Promise<void> {
+    const largeAmount = await toInternalUnits(fees, 1000n);
+    await fees.transfer(account1.address, largeAmount);
+    await fees.connect(account1).transfer(owner.address, await toInternalUnits(fees, amount));
+}
+
 // We define a fixture to reuse the same setup in every test.
 // We use loadFixture to run this setup once, snapshot that state,
 // and reset Hardhat Network to that snapshot in every test.

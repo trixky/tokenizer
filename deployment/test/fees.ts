@@ -739,48 +739,26 @@ describe("Fees System", function () {
         });
 
         it("Should prevent overflow with different fee percentages", async function () {
-            const { fees, owner, account1, account2 } = await loadFixture(deployFeesFixture);
-            // Connect to the contract as account1
-            const feesFromAccount1 = await fees.connect(account1);
+            const { fees, owner, account1 } = await loadFixture(deployFeesFixture);
 
-            // Test with 50% fees
-            await fees.updatePercentageFees(50);
-            const largeAmount = 2n ** 255n; // Half of max uint256
+            // Use 50% fees and compute a safe transfer amount based on owner's balance
+            const percentage = 50n;
+            await fees.updatePercentageFees(Number(percentage));
 
-            // Check if owner has enough tokens for this large amount
             const ownerBalance = await fees.balanceOf(owner.address);
-            if (ownerBalance >= largeAmount) {
-                await fees.transfer(account1.address, largeAmount);
+            // amount <= ownerBalance * 100 / (100 + percentage)
+            const amount = (ownerBalance * 100n) / (100n + percentage);
+            expect(amount).to.be.gt(0n);
 
-                // The new implementation should handle this without reverting
-                // It should use the alternative calculation method
-                await feesFromAccount1.transfer(account2.address, largeAmount);
+            const initialFees = await fees.getCollectedFees();
+            const expectedFee = (amount * percentage) / 100n;
 
-                // Verify that the transfer succeeded
-                expect(await fees.balanceOf(account1.address)).to.equal(0n); // All tokens transferred
-                expect(await fees.balanceOf(account2.address)).to.equal(largeAmount); // Received the transfer
-            } else {
-                // Skip test if not enough tokens
-                console.log("Skipping test - insufficient tokens for large amount test");
-            }
+            // This transfer exercises fee calculation without overflow and without exceeding balances
+            await fees.transfer(account1.address, amount);
 
-            // Test with 25% fees
-            await fees.updatePercentageFees(25);
-            const smallerAmount = 2n ** 254n; // Quarter of max uint256
-
-            if (ownerBalance >= smallerAmount) {
-                await fees.transfer(account1.address, smallerAmount);
-
-                // This should also work with the new implementation
-                await feesFromAccount1.transfer(account2.address, smallerAmount);
-
-                // Verify that the transfer succeeded
-                expect(await fees.balanceOf(account1.address)).to.equal(0n); // All tokens transferred
-                expect(await fees.balanceOf(account2.address)).to.equal(smallerAmount); // Received the transfer
-            } else {
-                // Skip test if not enough tokens
-                console.log("Skipping test - insufficient tokens for smaller amount test");
-            }
+            // Verify results
+            expect(await fees.balanceOf(account1.address)).to.equal(amount);
+            expect(await fees.getCollectedFees()).to.equal(initialFees + expectedFee);
         });
 
         it("Should handle fee calculation with very large amounts", async function () {
@@ -823,27 +801,20 @@ describe("Fees System", function () {
             const feeAmount = transferAmount; // 100% fees
             const totalNeeded = transferAmount + feeAmount;
 
-            // Check if owner has enough tokens
-            const ownerBalance = await fees.balanceOf(owner.address);
-            if (ownerBalance >= totalNeeded) {
-                await fees.transfer(account1.address, totalNeeded);
+            await fees.transfer(account1.address, totalNeeded);
 
-                // Record the initial collected fees amount
-                const initialFees = await fees.getCollectedFees();
+            // Record the initial collected fees amount
+            const initialFees = await fees.getCollectedFees();
 
-                // Transfer should not cause overflow
-                await feesFromAccount1.transfer(account2.address, transferAmount);
+            // Transfer should not cause overflow
+            await feesFromAccount1.transfer(account2.address, transferAmount);
 
-                // Verify that fees were calculated correctly
-                expect(await fees.getCollectedFees()).to.equal(initialFees + feeAmount);
-                // Verify account1 has 0 balance (all went to fees)
-                expect(await fees.balanceOf(account1.address)).to.equal(0n);
-                // Verify account2 received the transfer amount
-                expect(await fees.balanceOf(account2.address)).to.equal(transferAmount);
-            } else {
-                // Skip test if not enough tokens
-                console.log("Skipping test - insufficient tokens for large amount test");
-            }
+            // Verify that fees were calculated correctly
+            expect(await fees.getCollectedFees()).to.equal(initialFees + feeAmount);
+            // Verify account1 has 0 balance (all went to fees)
+            expect(await fees.balanceOf(account1.address)).to.equal(0n);
+            // Verify account2 received the transfer amount
+            expect(await fees.balanceOf(account2.address)).to.equal(transferAmount);
         });
 
         it("Should prevent transfer to zero address", async function () {
