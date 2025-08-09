@@ -1,0 +1,7 @@
+{
+  "tokenName": "Fees42",
+  "tokenSymbol": "FE42",
+  "totalSupply": 1000000,
+  "percentageFees": 5,
+  "minimumSignatures": 2
+}

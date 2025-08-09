@@ -139,13 +139,22 @@ contract TokenWithFees is ERC20 {
     function _payFees(address addr, uint256 value) private {
         if (addr != address(0) && value > 0 && percentageFees > 0) {
             // Check for overflow in fee calculation
-            // We need to check if (value * percentageFees) / 100 would overflow
+            // We need to check if (value * percentageFees) would overflow
             // This happens when value * percentageFees > type(uint256).max
-            // For better precision, we check if value > type(uint256).max / percentageFees
-            if (percentageFees > 0 && value > type(uint256).max / percentageFees) {
-                revert FeeCalculationOverflow(value, percentageFees);
+            uint256 fees;
+            if (value > type(uint256).max / percentageFees) {
+                // If overflow would occur, use a safer calculation method
+                // Use higher precision arithmetic to avoid overflow
+                // fees = (value * percentageFees) / 100
+                // We can rewrite this as: fees = (value / 100) * percentageFees + (value % 100) * percentageFees / 100
+                uint256 quotient = value / 100;
+                uint256 remainder = value % 100;
+                fees = quotient * percentageFees + (remainder * percentageFees) / 100;
+            } else {
+                // Normal calculation: (value * percentageFees) / 100
+                fees = (value * percentageFees) / 100;
             }
-            uint256 fees = (value * percentageFees) / 100;
+
             if (fees > _balances[addr]) {
                 revert ERC20InsufficientBalance(addr, _balances[addr], fees);
             }
