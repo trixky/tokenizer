@@ -19,3 +19,13 @@ import {IERC20Errors} from "@openzeppelin/contracts/interfaces/draft-IERC6093.so
 Smart-contract address: 0x9C51dA027FB74eB8E3Ea0B48F4FB959Ab07ff433
 
 > Check https://testnet.bscscan.com/address/0x9C51dA027FB74eB8E3Ea0B48F4FB959Ab07ff433#code
+
+Network :
+
+- Network Name: BSC Testnet
+- RPC URL: https://data-seed-prebsc-1-s1.bnbchain.org:8545
+- ChainID: 97
+- Symbol: tBNB
+- Explorer: https://testnet.bscscan.com/
+
+> https://docs.bnbchain.org/bnb-smart-chain/developers/wallet-configuration/
