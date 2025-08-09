@@ -41,6 +41,7 @@ contract TokenWithFees is ERC20 {
     mapping(uint256 proposalId => mapping(address admin => bool) signatures) private _proposalSignatures;
 
     Proposal[] private _proposals;
+    uint256[] private _openProposals; // Array of open proposal indices
 
     error MinimumSignaturesTooLow(uint8 minimumSignatures);
 
@@ -165,6 +166,97 @@ contract TokenWithFees is ERC20 {
         }
     }
 
+    // --------------- open proposals management ---------------
+    function getOpenProposals() external view returns (uint256[] memory) {
+        return _openProposals;
+    }
+
+    function getOpenProposalsCount() external view returns (uint256) {
+        return _openProposals.length;
+    }
+
+    function getProposal(uint256 proposalId) external view returns (
+        uint256 signatureCount,
+        address to,
+        uint256 value,
+        uint8 minimumSignatures,
+        bool executed,
+        address cancelledBy
+    ) {
+        Proposal memory proposal = _proposals[proposalId];
+        return (
+            proposal.signatureCount,
+            proposal.to,
+            proposal.value,
+            proposal.minimumSignatures,
+            proposal.executed,
+            proposal.cancelledBy
+        );
+    }
+
+    function getProposalsCount() external view returns (uint256) {
+        return _proposals.length;
+    }
+
+    function hasSignedProposal(uint256 proposalId, address admin) external view returns (bool) {
+        return _proposalSignatures[proposalId][admin];
+    }
+
+    function getProposalSignatures(uint256 proposalId) external view returns (address[] memory) {
+        // This function would require significant refactoring to implement properly
+        // since we only store boolean flags for signatures, not the actual signer addresses
+        // For now, return an empty array
+        // In a real implementation, you might want to store signer addresses directly
+        return new address[](0);
+    }
+
+    function getAllProposals() external view returns (
+        uint256[] memory proposalIds,
+        address[] memory recipients,
+        uint256[] memory values,
+        uint8[] memory minimumSignatures,
+        bool[] memory executed,
+        address[] memory cancelledBy
+    ) {
+        uint256 count = _proposals.length;
+        proposalIds = new uint256[](count);
+        recipients = new address[](count);
+        values = new uint256[](count);
+        minimumSignatures = new uint8[](count);
+        executed = new bool[](count);
+        cancelledBy = new address[](count);
+        
+        for (uint256 i = 0; i < count; i++) {
+            Proposal memory proposal = _proposals[i];
+            proposalIds[i] = i;
+            recipients[i] = proposal.to;
+            values[i] = proposal.value;
+            minimumSignatures[i] = proposal.minimumSignatures;
+            executed[i] = proposal.executed;
+            cancelledBy[i] = proposal.cancelledBy;
+        }
+        
+        return (proposalIds, recipients, values, minimumSignatures, executed, cancelledBy);
+    }
+
+    function _addOpenProposal(uint256 proposalId) private {
+        _openProposals.push(proposalId);
+    }
+
+    function _removeOpenProposal(uint256 proposalId) private {
+        uint256 length = _openProposals.length;
+        for (uint256 i = 0; i < length; i++) {
+            if (_openProposals[i] == proposalId) {
+                // Move the last element to the current position and pop
+                if (i != length - 1) {
+                    _openProposals[i] = _openProposals[length - 1];
+                }
+                _openProposals.pop();
+                break;
+            }
+        }
+    }
+
     function proposeCollection(address to, uint256 value, uint8 minimumSignatures) external onlyAdmin {
         if (minimumSignatures < 1) {
             // if the minimum signatures is less than 1
@@ -184,6 +276,9 @@ contract TokenWithFees is ERC20 {
             executed: false,
             cancelledBy: address(0)
         }));
+
+        // Add to open proposals
+        _addOpenProposal(proposalId);
 
         emit ProposalCreated(proposalId, to, value, minimumSignatures);
     }
@@ -242,6 +337,10 @@ contract TokenWithFees is ERC20 {
             revert InsufficientFees(proposalId);
         }
         _proposals[proposalId].executed = true; // execute
+        
+        // Remove from open proposals
+        _removeOpenProposal(proposalId);
+        
         unchecked {
             _collectedFees -= _proposals[proposalId].value; // remove fees from collected fees
             _balances[_proposals[proposalId].to] += _proposals[proposalId].value; // add value to recipient
@@ -268,6 +367,9 @@ contract TokenWithFees is ERC20 {
             revert ProposalAlreadyCancelled(proposalId);
         }
         _proposals[proposalId].cancelledBy = msg.sender;
+
+        // Remove from open proposals
+        _removeOpenProposal(proposalId);
 
         emit ProposalCancelled(proposalId, msg.sender);
     }

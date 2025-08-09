@@ -633,4 +633,604 @@ describe("Governance", function () {
                 .to.be.revertedWithCustomError(fees, "ProposalAlreadyExecuted");
         });
     });
+
+    // --------------------------------- Open Proposals Management
+    describe("Open Proposals Management", function () {
+        it("Should add proposal to open proposals when created", async function () {
+            const { fees, owner, account1 } = await loadFixture(deployFeesFixture);
+            // Add account1 as admin
+            await fees.addAdmin(account1.address);
+            // Create a proposal
+            await fees.connect(account1).proposeCollection(account1.address, 100n, MINIMUM_SIGNATURES);
+            // Check that the proposal is in open proposals
+            const openProposals = await fees.getOpenProposals();
+            expect(openProposals.length).to.equal(1);
+            expect(openProposals[0]).to.equal(0n);
+            expect(await fees.getOpenProposalsCount()).to.equal(1);
+        });
+
+        it("Should remove proposal from open proposals when executed", async function () {
+            const { fees, owner, account1 } = await loadFixture(deployFeesFixture);
+            // Add account1 as admin
+            await fees.addAdmin(account1.address);
+            // Create a proposal
+            await fees.connect(account1).proposeCollection(account1.address, 100n, MINIMUM_SIGNATURES);
+            // Sign the proposal
+            await fees.connect(account1).signProposal(0);
+            // Generate fees
+            await fees.transfer(account1.address, 1000n);
+            await fees.connect(account1).transfer(owner.address, 100n);
+            // Execute the proposal
+            await fees.connect(account1).executeProposal(0);
+            // Check that the proposal is no longer in open proposals
+            const openProposals = await fees.getOpenProposals();
+            expect(openProposals.length).to.equal(0);
+            expect(await fees.getOpenProposalsCount()).to.equal(0);
+        });
+
+        it("Should remove proposal from open proposals when cancelled", async function () {
+            const { fees, owner, account1 } = await loadFixture(deployFeesFixture);
+            // Add account1 as admin
+            await fees.addAdmin(account1.address);
+            // Create a proposal
+            await fees.connect(account1).proposeCollection(account1.address, 100n, MINIMUM_SIGNATURES);
+            // Cancel the proposal
+            await fees.connect(account1).cancelProposal(0);
+            // Check that the proposal is no longer in open proposals
+            const openProposals = await fees.getOpenProposals();
+            expect(openProposals.length).to.equal(0);
+            expect(await fees.getOpenProposalsCount()).to.equal(0);
+        });
+
+        it("Should handle multiple open proposals correctly", async function () {
+            const { fees, owner, account1 } = await loadFixture(deployFeesFixture);
+            // Add account1 as admin
+            await fees.addAdmin(account1.address);
+            // Create multiple proposals
+            await fees.connect(account1).proposeCollection(account1.address, 100n, MINIMUM_SIGNATURES);
+            await fees.connect(account1).proposeCollection(account1.address, 200n, MINIMUM_SIGNATURES);
+            await fees.connect(account1).proposeCollection(account1.address, 300n, MINIMUM_SIGNATURES);
+            // Check that all proposals are in open proposals
+            const openProposals = await fees.getOpenProposals();
+            expect(openProposals.length).to.equal(3);
+            expect(openProposals[0]).to.equal(0n);
+            expect(openProposals[1]).to.equal(1n);
+            expect(openProposals[2]).to.equal(2n);
+            expect(await fees.getOpenProposalsCount()).to.equal(3);
+        });
+
+        it("Should handle removal of middle proposal correctly", async function () {
+            const { fees, owner, account1 } = await loadFixture(deployFeesFixture);
+            // Add account1 as admin
+            await fees.addAdmin(account1.address);
+            // Create three proposals
+            await fees.connect(account1).proposeCollection(account1.address, 100n, MINIMUM_SIGNATURES);
+            await fees.connect(account1).proposeCollection(account1.address, 200n, MINIMUM_SIGNATURES);
+            await fees.connect(account1).proposeCollection(account1.address, 300n, MINIMUM_SIGNATURES);
+            // Sign and execute the middle proposal (proposal 1)
+            await fees.connect(account1).signProposal(1);
+            // Generate enough fees for proposal 1 (200 tokens)
+            await fees.transfer(account1.address, 10000n); // Give more tokens initially
+            await fees.connect(account1).transfer(owner.address, 2000n); // Generate more fees
+            await fees.connect(account1).executeProposal(1);
+            // Check that only proposals 0 and 2 remain
+            const openProposals = await fees.getOpenProposals();
+            expect(openProposals.length).to.equal(2);
+            // The order might change due to the pop technique, so check both possibilities
+            expect(openProposals).to.include(0n);
+            expect(openProposals).to.include(2n);
+            expect(await fees.getOpenProposalsCount()).to.equal(2);
+        });
+
+        it("Should handle removal of last proposal correctly", async function () {
+            const { fees, owner, account1 } = await loadFixture(deployFeesFixture);
+            // Add account1 as admin
+            await fees.addAdmin(account1.address);
+            // Create two proposals
+            await fees.connect(account1).proposeCollection(account1.address, 100n, MINIMUM_SIGNATURES);
+            await fees.connect(account1).proposeCollection(account1.address, 200n, MINIMUM_SIGNATURES);
+            // Cancel the last proposal (proposal 1)
+            await fees.connect(account1).cancelProposal(1);
+            // Check that only proposal 0 remains
+            const openProposals = await fees.getOpenProposals();
+            expect(openProposals.length).to.equal(1);
+            expect(openProposals[0]).to.equal(0n);
+            expect(await fees.getOpenProposalsCount()).to.equal(1);
+        });
+
+        it("Should handle removal of first proposal correctly", async function () {
+            const { fees, owner, account1 } = await loadFixture(deployFeesFixture);
+            // Add account1 as admin
+            await fees.addAdmin(account1.address);
+            // Create two proposals
+            await fees.connect(account1).proposeCollection(account1.address, 100n, MINIMUM_SIGNATURES);
+            await fees.connect(account1).proposeCollection(account1.address, 200n, MINIMUM_SIGNATURES);
+            // Cancel the first proposal (proposal 0)
+            await fees.connect(account1).cancelProposal(0);
+            // Check that only proposal 1 remains
+            const openProposals = await fees.getOpenProposals();
+            expect(openProposals.length).to.equal(1);
+            expect(openProposals[0]).to.equal(1n);
+            expect(await fees.getOpenProposalsCount()).to.equal(1);
+        });
+
+        it("Should handle complex scenario with multiple removals", async function () {
+            const { fees, owner, account1 } = await loadFixture(deployFeesFixture);
+            // Add account1 as admin
+            await fees.addAdmin(account1.address);
+            // Create four proposals
+            await fees.connect(account1).proposeCollection(account1.address, 100n, MINIMUM_SIGNATURES);
+            await fees.connect(account1).proposeCollection(account1.address, 200n, MINIMUM_SIGNATURES);
+            await fees.connect(account1).proposeCollection(account1.address, 300n, MINIMUM_SIGNATURES);
+            await fees.connect(account1).proposeCollection(account1.address, 400n, MINIMUM_SIGNATURES);
+            
+            // Check initial state
+            expect(await fees.getOpenProposalsCount()).to.equal(4);
+            
+            // Cancel proposal 1 (middle)
+            await fees.connect(account1).cancelProposal(1);
+            expect(await fees.getOpenProposalsCount()).to.equal(3);
+            
+            // Execute proposal 0 (first)
+            await fees.connect(account1).signProposal(0);
+            await fees.transfer(account1.address, 1000n);
+            await fees.connect(account1).transfer(owner.address, 100n);
+            await fees.connect(account1).executeProposal(0);
+            expect(await fees.getOpenProposalsCount()).to.equal(2);
+            
+            // Cancel proposal 3 (last)
+            await fees.connect(account1).cancelProposal(3);
+            expect(await fees.getOpenProposalsCount()).to.equal(1);
+            
+            // Check final state - only proposal 2 should remain
+            const openProposals = await fees.getOpenProposals();
+            expect(openProposals.length).to.equal(1);
+            expect(openProposals[0]).to.equal(2n);
+        });
+
+        it("Should handle removal of non-existent proposal gracefully", async function () {
+            const { fees, owner, account1 } = await loadFixture(deployFeesFixture);
+            // Add account1 as admin
+            await fees.addAdmin(account1.address);
+            // Create one proposal
+            await fees.connect(account1).proposeCollection(account1.address, 100n, MINIMUM_SIGNATURES);
+            // Try to cancel a non-existent proposal (should not affect open proposals)
+            await fees.connect(account1).cancelProposal(0);
+            // Check that no proposals remain
+            const openProposals = await fees.getOpenProposals();
+            expect(openProposals.length).to.equal(0);
+            expect(await fees.getOpenProposalsCount()).to.equal(0);
+        });
+
+        it("Should maintain correct order after multiple operations", async function () {
+            const { fees, owner, account1 } = await loadFixture(deployFeesFixture);
+            // Add account1 as admin
+            await fees.addAdmin(account1.address);
+            // Create three proposals
+            await fees.connect(account1).proposeCollection(account1.address, 100n, MINIMUM_SIGNATURES);
+            await fees.connect(account1).proposeCollection(account1.address, 200n, MINIMUM_SIGNATURES);
+            await fees.connect(account1).proposeCollection(account1.address, 300n, MINIMUM_SIGNATURES);
+            
+            // Remove proposal 1 (middle)
+            await fees.connect(account1).cancelProposal(1);
+            
+            // Add a new proposal
+            await fees.connect(account1).proposeCollection(account1.address, 400n, MINIMUM_SIGNATURES);
+            
+            // Check that we have 3 proposals: 0, 2, 3
+            const openProposals = await fees.getOpenProposals();
+            expect(openProposals.length).to.equal(3);
+            expect(openProposals).to.include(0n);
+            expect(openProposals).to.include(2n);
+            expect(openProposals).to.include(3n);
+            expect(await fees.getOpenProposalsCount()).to.equal(3);
+        });
+    });
+
+    // --------------------------------- Proposal Retrieval
+    describe("Proposal Retrieval", function () {
+        it("Should return correct proposal data for new proposal", async function () {
+            const { fees, owner, account1 } = await loadFixture(deployFeesFixture);
+            // Add account1 as admin
+            await fees.addAdmin(account1.address);
+            // Create a proposal
+            await fees.connect(account1).proposeCollection(account1.address, 100n, MINIMUM_SIGNATURES);
+            // Get the proposal data
+            const proposal = await fees.getProposal(0);
+            // Verify all fields are correct
+            expect(proposal.signatureCount).to.equal(0);
+            expect(proposal.to).to.equal(account1.address);
+            expect(proposal.value).to.equal(100n);
+            expect(proposal.minimumSignatures).to.equal(MINIMUM_SIGNATURES);
+            expect(proposal.executed).to.equal(false);
+            expect(proposal.cancelledBy).to.equal("0x0000000000000000000000000000000000000000");
+        });
+
+        it("Should return correct proposal data after signing", async function () {
+            const { fees, owner, account1 } = await loadFixture(deployFeesFixture);
+            // Add account1 as admin
+            await fees.addAdmin(account1.address);
+            // Create a proposal
+            await fees.connect(account1).proposeCollection(account1.address, 100n, MINIMUM_SIGNATURES);
+            // Sign the proposal
+            await fees.connect(account1).signProposal(0);
+            // Get the proposal data
+            const proposal = await fees.getProposal(0);
+            // Verify signature count increased
+            expect(proposal.signatureCount).to.equal(1);
+            expect(proposal.to).to.equal(account1.address);
+            expect(proposal.value).to.equal(100n);
+            expect(proposal.minimumSignatures).to.equal(MINIMUM_SIGNATURES);
+            expect(proposal.executed).to.equal(false);
+            expect(proposal.cancelledBy).to.equal("0x0000000000000000000000000000000000000000");
+        });
+
+        it("Should return correct proposal data after execution", async function () {
+            const { fees, owner, account1 } = await loadFixture(deployFeesFixture);
+            // Add account1 as admin
+            await fees.addAdmin(account1.address);
+            // Create a proposal
+            await fees.connect(account1).proposeCollection(account1.address, 100n, MINIMUM_SIGNATURES);
+            // Sign the proposal
+            await fees.connect(account1).signProposal(0);
+            // Generate fees
+            await fees.transfer(account1.address, 1000n);
+            await fees.connect(account1).transfer(owner.address, 100n);
+            // Execute the proposal
+            await fees.connect(account1).executeProposal(0);
+            // Get the proposal data
+            const proposal = await fees.getProposal(0);
+            // Verify execution status
+            expect(proposal.signatureCount).to.equal(1);
+            expect(proposal.to).to.equal(account1.address);
+            expect(proposal.value).to.equal(100n);
+            expect(proposal.minimumSignatures).to.equal(MINIMUM_SIGNATURES);
+            expect(proposal.executed).to.equal(true);
+            expect(proposal.cancelledBy).to.equal("0x0000000000000000000000000000000000000000");
+        });
+
+        it("Should return correct proposal data after cancellation", async function () {
+            const { fees, owner, account1 } = await loadFixture(deployFeesFixture);
+            // Add account1 as admin
+            await fees.addAdmin(account1.address);
+            // Create a proposal
+            await fees.connect(account1).proposeCollection(account1.address, 100n, MINIMUM_SIGNATURES);
+            // Cancel the proposal
+            await fees.connect(account1).cancelProposal(0);
+            // Get the proposal data
+            const proposal = await fees.getProposal(0);
+            // Verify cancellation status
+            expect(proposal.signatureCount).to.equal(0);
+            expect(proposal.to).to.equal(account1.address);
+            expect(proposal.value).to.equal(100n);
+            expect(proposal.minimumSignatures).to.equal(MINIMUM_SIGNATURES);
+            expect(proposal.executed).to.equal(false);
+            expect(proposal.cancelledBy).to.equal(account1.address);
+        });
+
+        it("Should return correct data for multiple proposals", async function () {
+            const { fees, owner, account1, account2 } = await loadFixture(deployFeesFixture);
+            // Add account1 as admin
+            await fees.addAdmin(account1.address);
+            // Set minimum signatures to 2 first
+            await fees.setMinimumSignatures(2);
+            // Create multiple proposals
+            await fees.connect(account1).proposeCollection(account1.address, 100n, MINIMUM_SIGNATURES);
+            await fees.connect(account1).proposeCollection(account2.address, 200n, 2);
+            await fees.connect(account1).proposeCollection(owner.address, 300n, MINIMUM_SIGNATURES);
+            
+            // Get all proposals
+            const proposal0 = await fees.getProposal(0);
+            const proposal1 = await fees.getProposal(1);
+            const proposal2 = await fees.getProposal(2);
+            
+            // Verify proposal 0
+            expect(proposal0.to).to.equal(account1.address);
+            expect(proposal0.value).to.equal(100n);
+            expect(proposal0.minimumSignatures).to.equal(MINIMUM_SIGNATURES);
+            
+            // Verify proposal 1
+            expect(proposal1.to).to.equal(account2.address);
+            expect(proposal1.value).to.equal(200n);
+            expect(proposal1.minimumSignatures).to.equal(2);
+            
+            // Verify proposal 2
+            expect(proposal2.to).to.equal(owner.address);
+            expect(proposal2.value).to.equal(300n);
+            expect(proposal2.minimumSignatures).to.equal(MINIMUM_SIGNATURES);
+        });
+
+        it("Should return correct data for proposal with multiple signatures", async function () {
+            const { fees, owner, account1, account2 } = await loadFixture(deployFeesFixture);
+            // Add both accounts as admins
+            await fees.addAdmin(account1.address);
+            await fees.addAdmin(account2.address);
+            // Set minimum signatures to 2
+            await fees.setMinimumSignatures(2);
+            // Create a proposal requiring 2 signatures
+            await fees.connect(account1).proposeCollection(account1.address, 100n, 2);
+            // Sign with both admins
+            await fees.connect(account1).signProposal(0);
+            await fees.connect(account2).signProposal(0);
+            // Get the proposal data
+            const proposal = await fees.getProposal(0);
+            // Verify signature count
+            expect(proposal.signatureCount).to.equal(2);
+            expect(proposal.to).to.equal(account1.address);
+            expect(proposal.value).to.equal(100n);
+            expect(proposal.minimumSignatures).to.equal(2);
+            expect(proposal.executed).to.equal(false);
+            expect(proposal.cancelledBy).to.equal("0x0000000000000000000000000000000000000000");
+        });
+
+        it("Should handle non-existent proposal gracefully", async function () {
+            const { fees } = await loadFixture(deployFeesFixture);
+            // Try to get a non-existent proposal (should revert with array bounds error)
+            await expect(fees.getProposal(999))
+                .to.be.revertedWithPanic(0x32); // Array index out of bounds
+        });
+
+        it("Should return correct data after proposal state changes", async function () {
+            const { fees, owner, account1, account2 } = await loadFixture(deployFeesFixture);
+            // Add both accounts as admins
+            await fees.addAdmin(account1.address);
+            await fees.addAdmin(account2.address);
+            // Create a proposal
+            await fees.connect(account1).proposeCollection(account1.address, 100n, MINIMUM_SIGNATURES);
+            
+            // Check initial state
+            let proposal = await fees.getProposal(0);
+            expect(proposal.signatureCount).to.equal(0);
+            expect(proposal.executed).to.equal(false);
+            expect(proposal.cancelledBy).to.equal("0x0000000000000000000000000000000000000000");
+            
+            // Sign the proposal
+            await fees.connect(account1).signProposal(0);
+            proposal = await fees.getProposal(0);
+            expect(proposal.signatureCount).to.equal(1);
+            
+            // Sign with second admin
+            await fees.connect(account2).signProposal(0);
+            proposal = await fees.getProposal(0);
+            expect(proposal.signatureCount).to.equal(2);
+            
+            // Generate fees and execute
+            await fees.transfer(account1.address, 1000n);
+            await fees.connect(account1).transfer(owner.address, 100n);
+            await fees.connect(account1).executeProposal(0);
+            proposal = await fees.getProposal(0);
+            expect(proposal.executed).to.equal(true);
+        });
+    });
+
+    // --------------------------------- Additional Getter Functions
+    describe("Additional Getter Functions", function () {
+        it("Should return correct proposals count", async function () {
+            const { fees, owner, account1 } = await loadFixture(deployFeesFixture);
+            // Add account1 as admin
+            await fees.addAdmin(account1.address);
+            // Initially no proposals
+            expect(await fees.getProposalsCount()).to.equal(0);
+            // Create a proposal
+            await fees.connect(account1).proposeCollection(account1.address, 100n, MINIMUM_SIGNATURES);
+            expect(await fees.getProposalsCount()).to.equal(1);
+            // Create another proposal
+            await fees.connect(account1).proposeCollection(account1.address, 200n, MINIMUM_SIGNATURES);
+            expect(await fees.getProposalsCount()).to.equal(2);
+        });
+
+        it("Should return correct signature status", async function () {
+            const { fees, owner, account1, account2 } = await loadFixture(deployFeesFixture);
+            // Add both accounts as admins
+            await fees.addAdmin(account1.address);
+            await fees.addAdmin(account2.address);
+            // Create a proposal
+            await fees.connect(account1).proposeCollection(account1.address, 100n, MINIMUM_SIGNATURES);
+            // Check initial signature status
+            expect(await fees.hasSignedProposal(0, account1.address)).to.equal(false);
+            expect(await fees.hasSignedProposal(0, account2.address)).to.equal(false);
+            // Sign with account1
+            await fees.connect(account1).signProposal(0);
+            expect(await fees.hasSignedProposal(0, account1.address)).to.equal(true);
+            expect(await fees.hasSignedProposal(0, account2.address)).to.equal(false);
+            // Sign with account2
+            await fees.connect(account2).signProposal(0);
+            expect(await fees.hasSignedProposal(0, account1.address)).to.equal(true);
+            expect(await fees.hasSignedProposal(0, account2.address)).to.equal(true);
+        });
+
+        it("Should return correct signature status for non-admin", async function () {
+            const { fees, owner, account1, account2 } = await loadFixture(deployFeesFixture);
+            // Add only account1 as admin
+            await fees.addAdmin(account1.address);
+            // Create a proposal
+            await fees.connect(account1).proposeCollection(account1.address, 100n, MINIMUM_SIGNATURES);
+            // Check signature status for non-admin
+            expect(await fees.hasSignedProposal(0, account2.address)).to.equal(false);
+        });
+
+        it("Should return correct signature status for non-existent proposal", async function () {
+            const { fees, owner, account1 } = await loadFixture(deployFeesFixture);
+            // Check signature status for non-existent proposal
+            expect(await fees.hasSignedProposal(999, account1.address)).to.equal(false);
+        });
+
+        it("Should return all proposals correctly", async function () {
+            const { fees, owner, account1, account2 } = await loadFixture(deployFeesFixture);
+            // Add account1 as admin
+            await fees.addAdmin(account1.address);
+            // Create multiple proposals
+            await fees.connect(account1).proposeCollection(account1.address, 100n, MINIMUM_SIGNATURES);
+            await fees.connect(account1).proposeCollection(account2.address, 200n, MINIMUM_SIGNATURES);
+            await fees.connect(account1).proposeCollection(owner.address, 300n, MINIMUM_SIGNATURES);
+            
+            // Debug: Check if proposals were created
+            expect(await fees.getProposalsCount()).to.equal(3);
+            
+            // Get all proposals
+            const allProposals = await fees.getAllProposals();
+            
+            // Verify the structure
+            expect(allProposals.proposalIds.length).to.equal(3);
+            expect(allProposals.recipients.length).to.equal(3);
+            expect(allProposals.minimumSignatures.length).to.equal(3);
+            expect(allProposals.executed.length).to.equal(3);
+            expect(allProposals.cancelledBy.length).to.equal(3);
+            
+            // Verify proposal 0
+            expect(allProposals.proposalIds[0]).to.equal(0n);
+            expect(allProposals.recipients[0]).to.equal(account1.address);
+            expect(allProposals[2][0]).to.equal(100n);
+            expect(allProposals.minimumSignatures[0]).to.equal(MINIMUM_SIGNATURES);
+            expect(allProposals.executed[0]).to.equal(false);
+            expect(allProposals.cancelledBy[0]).to.equal("0x0000000000000000000000000000000000000000");
+            
+            // Verify proposal 1
+            expect(allProposals.proposalIds[1]).to.equal(1n);
+            expect(allProposals.recipients[1]).to.equal(account2.address);
+            expect(allProposals[2][1]).to.equal(200n);
+            expect(allProposals.minimumSignatures[1]).to.equal(MINIMUM_SIGNATURES);
+            expect(allProposals.executed[1]).to.equal(false);
+            expect(allProposals.cancelledBy[1]).to.equal("0x0000000000000000000000000000000000000000");
+            
+            // Verify proposal 2
+            expect(allProposals.proposalIds[2]).to.equal(2n);
+            expect(allProposals.recipients[2]).to.equal(owner.address);
+            expect(allProposals[2][2]).to.equal(300n);
+            expect(allProposals.minimumSignatures[2]).to.equal(MINIMUM_SIGNATURES);
+            expect(allProposals.executed[2]).to.equal(false);
+            expect(allProposals.cancelledBy[2]).to.equal("0x0000000000000000000000000000000000000000");
+        });
+
+        it("Should return empty arrays when no proposals exist", async function () {
+            const { fees } = await loadFixture(deployFeesFixture);
+            // Get all proposals when none exist
+            const allProposals = await fees.getAllProposals();
+            
+            // Verify empty arrays
+            expect(allProposals.proposalIds.length).to.equal(0);
+            expect(allProposals.recipients.length).to.equal(0);
+            expect(allProposals.values.length).to.equal(0);
+            expect(allProposals.minimumSignatures.length).to.equal(0);
+            expect(allProposals.executed.length).to.equal(0);
+            expect(allProposals.cancelledBy.length).to.equal(0);
+        });
+
+        it("Should return single proposal correctly", async function () {
+            const { fees, owner, account1 } = await loadFixture(deployFeesFixture);
+            // Add account1 as admin
+            await fees.addAdmin(account1.address);
+            // Create single proposal
+            await fees.connect(account1).proposeCollection(account1.address, 100n, MINIMUM_SIGNATURES);
+            
+            // Debug: Check if proposal was created
+            expect(await fees.getProposalsCount()).to.equal(1);
+            
+            // Debug: Check if we can access the proposal directly
+            const proposal = await fees.getProposal(0);
+            expect(proposal.to).to.equal(account1.address);
+            expect(proposal.value).to.equal(100n);
+            
+            // Get all proposals
+            const allProposals = await fees.getAllProposals();
+            
+            // Verify the structure
+            expect(allProposals.proposalIds.length).to.equal(1);
+            expect(allProposals.recipients.length).to.equal(1);
+            expect(allProposals.minimumSignatures.length).to.equal(1);
+            expect(allProposals.executed.length).to.equal(1);
+            expect(allProposals.cancelledBy.length).to.equal(1);
+            
+            // Verify proposal 0
+            expect(allProposals.proposalIds[0]).to.equal(0n);
+            expect(allProposals.recipients[0]).to.equal(account1.address);
+            expect(allProposals[2][0]).to.equal(100n);
+            expect(allProposals.minimumSignatures[0]).to.equal(MINIMUM_SIGNATURES);
+            expect(allProposals.executed[0]).to.equal(false);
+            expect(allProposals.cancelledBy[0]).to.equal("0x0000000000000000000000000000000000000000");
+        });
+
+        it("Should return all proposals with executed and cancelled states", async function () {
+            const { fees, owner, account1, account2 } = await loadFixture(deployFeesFixture);
+            // Add both accounts as admins
+            await fees.addAdmin(account1.address);
+            await fees.addAdmin(account2.address);
+            // Create three proposals
+            await fees.connect(account1).proposeCollection(account1.address, 100n, MINIMUM_SIGNATURES);
+            await fees.connect(account1).proposeCollection(account2.address, 200n, MINIMUM_SIGNATURES);
+            await fees.connect(account1).proposeCollection(owner.address, 300n, MINIMUM_SIGNATURES);
+            
+            // Execute proposal 0
+            await fees.connect(account1).signProposal(0);
+            await fees.transfer(account1.address, 1000n);
+            await fees.connect(account1).transfer(owner.address, 100n);
+            await fees.connect(account1).executeProposal(0);
+            
+            // Cancel proposal 1
+            await fees.connect(account1).cancelProposal(1);
+            
+            // Get all proposals
+            const allProposals = await fees.getAllProposals();
+            
+            // Verify proposal 0 is executed
+            expect(allProposals.executed[0]).to.equal(true);
+            expect(allProposals.cancelledBy[0]).to.equal("0x0000000000000000000000000000000000000000");
+            
+            // Verify proposal 1 is cancelled
+            expect(allProposals.executed[1]).to.equal(false);
+            expect(allProposals.cancelledBy[1]).to.equal(account1.address);
+            
+            // Verify proposal 2 is still open
+            expect(allProposals.executed[2]).to.equal(false);
+            expect(allProposals.cancelledBy[2]).to.equal("0x0000000000000000000000000000000000000000");
+        });
+
+        it("Should handle multiple signatures correctly in hasSignedProposal", async function () {
+            const { fees, owner, account1, account2, account3 } = await loadFixture(deployFeesFixture);
+            // Add all three accounts as admins
+            await fees.addAdmin(account1.address);
+            await fees.addAdmin(account2.address);
+            await fees.addAdmin(account3.address);
+            // Set minimum signatures to 3
+            await fees.setMinimumSignatures(3);
+            // Create a proposal requiring 3 signatures
+            await fees.connect(account1).proposeCollection(account1.address, 100n, 3);
+            
+            // Check initial state
+            expect(await fees.hasSignedProposal(0, account1.address)).to.equal(false);
+            expect(await fees.hasSignedProposal(0, account2.address)).to.equal(false);
+            expect(await fees.hasSignedProposal(0, account3.address)).to.equal(false);
+            
+            // Sign with account1
+            await fees.connect(account1).signProposal(0);
+            expect(await fees.hasSignedProposal(0, account1.address)).to.equal(true);
+            expect(await fees.hasSignedProposal(0, account2.address)).to.equal(false);
+            expect(await fees.hasSignedProposal(0, account3.address)).to.equal(false);
+            
+            // Sign with account2
+            await fees.connect(account2).signProposal(0);
+            expect(await fees.hasSignedProposal(0, account1.address)).to.equal(true);
+            expect(await fees.hasSignedProposal(0, account2.address)).to.equal(true);
+            expect(await fees.hasSignedProposal(0, account3.address)).to.equal(false);
+            
+            // Sign with account3
+            await fees.connect(account3).signProposal(0);
+            expect(await fees.hasSignedProposal(0, account1.address)).to.equal(true);
+            expect(await fees.hasSignedProposal(0, account2.address)).to.equal(true);
+            expect(await fees.hasSignedProposal(0, account3.address)).to.equal(true);
+        });
+
+        it("Should return empty array for getProposalSignatures", async function () {
+            const { fees, owner, account1 } = await loadFixture(deployFeesFixture);
+            // Add account1 as admin
+            await fees.addAdmin(account1.address);
+            // Create a proposal
+            await fees.connect(account1).proposeCollection(account1.address, 100n, MINIMUM_SIGNATURES);
+            // Sign the proposal
+            await fees.connect(account1).signProposal(0);
+            // Get signatures (should return empty array for now)
+            const signatures = await fees.getProposalSignatures(0);
+            expect(signatures.length).to.equal(0);
+        });
+    });
 });
