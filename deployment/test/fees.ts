@@ -3,8 +3,7 @@ import {
 } from "@nomicfoundation/hardhat-toolbox/network-helpers";
 import { expect } from "chai";
 import { ethers } from "hardhat";
-import { deployFeesFixture, TOTAL_SUPPLY, PERCENTAGE_FEES, MINIMUM_SIGNATURES } from "./main";
-import { MaxUint256 } from "ethers";
+import { deployFeesFixture, MINIMUM_SIGNATURES, PERCENTAGE_FEES } from "./main";
 
 describe("Fees System", function () {
     // --------------------------------- Fee Collection
@@ -183,7 +182,7 @@ describe("Fees System", function () {
     // --------------------------------- Proposal Creation and Execution
     describe("Proposal Creation and Execution", function () {
         it("Should create proposal with correct parameters", async function () {
-            const { fees, owner, account1 } = await loadFixture(deployFeesFixture);
+            const { fees, account1 } = await loadFixture(deployFeesFixture);
             // Add account1 as admin so it can create proposals
             await fees.addAdmin(account1);
 
@@ -195,24 +194,25 @@ describe("Fees System", function () {
 
         it("Should execute proposal and transfer collected fees", async function () {
             const { fees, owner, account1 } = await loadFixture(deployFeesFixture);
+            const feesFromAccount1 = await fees.connect(account1);
             // Add account1 as admin so it can create and execute proposals
             await fees.addAdmin(account1);
 
             // Create proposal
-            await fees.connect(account1).proposeCollection(account1.address, 100n, MINIMUM_SIGNATURES);
+            await feesFromAccount1.proposeCollection(account1.address, 100n, MINIMUM_SIGNATURES);
             // Sign the proposal
-            await fees.connect(account1).signProposal(0);
+            await feesFromAccount1.signProposal(0);
 
             // Generate fees - need to transfer to account1 first, then transfer back to generate fees
             await fees.transfer(account1.address, 1100n); // Give account1 enough tokens
-            await fees.connect(account1).transfer(owner.address, 1000n); // This generates 100 fees
+            await feesFromAccount1.transfer(owner.address, 1000n); // This generates 100 fees
 
             // Check that we have enough fees before execution
             const feesBeforeExecution = await fees.getCollectedFees();
             expect(feesBeforeExecution).to.be.gte(100n); // At least 100 fees collected
 
             // Execute proposal
-            await expect(fees.connect(account1).executeProposal(0))
+            await expect(feesFromAccount1.executeProposal(0))
                 .to.emit(fees, "ProposalExecuted")
                 .withArgs(0, account1.address, 100n);
 
@@ -223,43 +223,45 @@ describe("Fees System", function () {
         });
 
         it("Should fail to execute proposal without enough fees", async function () {
-            const { fees, owner, account1 } = await loadFixture(deployFeesFixture);
+            const { fees, account1 } = await loadFixture(deployFeesFixture);
+            const feesFromAccount1 = await fees.connect(account1);
             // Add account1 as admin so it can create proposals
             await fees.addAdmin(account1);
 
             // Create a proposal for 1000 tokens
-            await fees.connect(account1).proposeCollection(account1.address, 1000n, MINIMUM_SIGNATURES);
+            await feesFromAccount1.proposeCollection(account1.address, 1000n, MINIMUM_SIGNATURES);
             // Sign the proposal
-            await fees.connect(account1).signProposal(0);
+            await feesFromAccount1.signProposal(0);
 
             // Check that we don't have enough fees
             const currentFees = await fees.getCollectedFees();
             expect(currentFees).to.be.lt(1000n); // Not enough fees
             // Try to execute the proposal (should fail)
-            await expect(fees.connect(account1).executeProposal(0))
+            await expect(feesFromAccount1.executeProposal(0))
                 .to.be.revertedWithCustomError(fees, "InsufficientFees");
         });
 
         it("Should execute proposal with exact fee amount", async function () {
             const { fees, owner, account1 } = await loadFixture(deployFeesFixture);
+            const feesFromAccount1 = await fees.connect(account1);
             // Add account1 as admin so it can create and execute proposals
             await fees.addAdmin(account1);
 
             // Create a proposal for exactly 50 tokens
-            await fees.connect(account1).proposeCollection(account1.address, 50n, MINIMUM_SIGNATURES);
+            await feesFromAccount1.proposeCollection(account1.address, 50n, MINIMUM_SIGNATURES);
             // Sign the proposal
-            await fees.connect(account1).signProposal(0);
+            await feesFromAccount1.signProposal(0);
 
             // Generate exactly 50 fees
             await fees.transfer(account1.address, 550n); // Give account1 enough tokens
-            await fees.connect(account1).transfer(owner.address, 500n); // Generates 50 fees
+            await feesFromAccount1.transfer(owner.address, 500n); // Generates 50 fees
 
             // Check that we have enough fees before execution
             const feesBeforeExecution = await fees.getCollectedFees();
             expect(feesBeforeExecution).to.be.gte(50n); // At least 50 fees collected
 
             // Execute the proposal
-            await fees.connect(account1).executeProposal(0);
+            await feesFromAccount1.executeProposal(0);
             // Verify account1 received the exact amount from the proposal
             expect(await fees.balanceOf(account1.address)).to.equal(50n); // 550 - 500 - 50 fees + 50 from proposal
             // Verify that fees were consumed by the proposal
@@ -268,31 +270,33 @@ describe("Fees System", function () {
 
         it("Should handle multiple proposals correctly", async function () {
             const { fees, owner, account1, account2 } = await loadFixture(deployFeesFixture);
+            const feesFromAccount1 = await fees.connect(account1);
+            const feesFromAccount2 = await fees.connect(account2);
             // Add both accounts as admins so they can create proposals
             await fees.addAdmin(account1);
             await fees.addAdmin(account2);
 
             // Create two proposals
-            await fees.connect(account1).proposeCollection(account1.address, 100n, MINIMUM_SIGNATURES);
-            await fees.connect(account2).proposeCollection(account2.address, 200n, MINIMUM_SIGNATURES);
+            await feesFromAccount1.proposeCollection(account1.address, 100n, MINIMUM_SIGNATURES);
+            await feesFromAccount2.proposeCollection(account2.address, 200n, MINIMUM_SIGNATURES);
 
             // Sign both proposals
-            await fees.connect(account1).signProposal(0);
-            await fees.connect(account2).signProposal(1);
+            await feesFromAccount1.signProposal(0);
+            await feesFromAccount2.signProposal(1);
 
             // Generate enough fees for both proposals
             await fees.transfer(account1.address, 3300n); // Give account1 enough tokens
-            await fees.connect(account1).transfer(owner.address, 3000n); // Generates 300 fees
+            await feesFromAccount1.transfer(owner.address, 3000n); // Generates 300 fees
 
             // Check that we have enough fees before execution
             const feesBeforeExecution = await fees.getCollectedFees();
             expect(feesBeforeExecution).to.be.gte(300n); // At least 300 fees collected
 
             // Execute both proposals
-            await fees.connect(account1).executeProposal(0);
+            await feesFromAccount1.executeProposal(0);
             expect(await fees.getCollectedFees()).to.equal(feesBeforeExecution - 100n); // 300 - 100 = 200 fees remaining
 
-            await fees.connect(account2).executeProposal(1);
+            await feesFromAccount2.executeProposal(1);
             expect(await fees.getCollectedFees()).to.equal(feesBeforeExecution - 300n); // 200 - 200 = 0 fees remaining
 
             // Verify final balances
@@ -344,9 +348,7 @@ describe("Fees System", function () {
         });
 
         it("Should handle large transfers without overflow", async function () {
-            const { fees, account1, account2 } = await loadFixture(deployFeesFixture);
-            // Connect to the contract as account1
-            const feesFromAccount1 = await fees.connect(account1);
+            const { fees, account1 } = await loadFixture(deployFeesFixture);
             // Define a very large amount that exceeds total supply
             const largeAmount = 1000000000000000000000000n; // Very large amount that exceeds total supply
 
@@ -356,7 +358,7 @@ describe("Fees System", function () {
         });
 
         it("Should handle proposal with zero value", async function () {
-            const { fees, owner, account1 } = await loadFixture(deployFeesFixture);
+            const { fees, account1 } = await loadFixture(deployFeesFixture);
             // Add account1 as admin so it can create proposals
             await fees.addAdmin(account1);
 
@@ -369,7 +371,7 @@ describe("Fees System", function () {
     // --------------------------------- Fee Integration Tests
     describe("Fee Integration Tests", function () {
         it("Should work with complex transfer scenarios", async function () {
-            const { fees, owner, account1, account2, account3 } = await loadFixture(deployFeesFixture);
+            const { fees, account1, account2, account3 } = await loadFixture(deployFeesFixture);
             // Connect to the contract as account1 and account2
             const feesFromAccount1 = await fees.connect(account1);
             const feesFromAccount2 = await fees.connect(account2);
@@ -401,7 +403,7 @@ describe("Fees System", function () {
         });
 
         it("Should handle fees with transferFrom and approvals", async function () {
-            const { fees, owner, account1, account2, account3 } = await loadFixture(deployFeesFixture);
+            const { fees, account1, account2, account3 } = await loadFixture(deployFeesFixture);
             // Connect to the contract as all accounts
             const feesFromAccount1 = await fees.connect(account1);
             const feesFromAccount2 = await fees.connect(account2);
@@ -436,6 +438,8 @@ describe("Fees System", function () {
 
         it("Should handle proposal execution with mixed fee sources", async function () {
             const { fees, owner, account1, account2 } = await loadFixture(deployFeesFixture);
+            const feesFromAccount1 = await fees.connect(account1);
+            const feesFromAccount2 = await fees.connect(account2);
             // Add both accounts as admins so they can create proposals
             await fees.addAdmin(account1);
             await fees.addAdmin(account2);
@@ -444,10 +448,10 @@ describe("Fees System", function () {
             await fees.setMinimumSignatures(2);
 
             // Create proposal
-            await fees.connect(account1).proposeCollection(account1.address, 500n, 2);
+            await feesFromAccount1.proposeCollection(account1.address, 500n, 2);
             // Sign the proposal with both admins
-            await fees.connect(account1).signProposal(0);
-            await fees.connect(account2).signProposal(0);
+            await feesFromAccount1.signProposal(0);
+            await feesFromAccount2.signProposal(0);
 
             // Generate fees from multiple sources
             await fees.transfer(account1.address, 3000n); // Give account1 enough tokens
@@ -458,15 +462,15 @@ describe("Fees System", function () {
 
             // Generate fees through transfers
             // First transfer generates 200 fees
-            await fees.connect(account1).transfer(owner.address, 2000n); // 200 fees
+            await feesFromAccount1.transfer(owner.address, 2000n); // 200 fees
             expect(await fees.getCollectedFees()).to.equal(initialFees + 200n);
 
             // Second transfer generates 300 fees
-            await fees.connect(account2).transfer(owner.address, 3000n); // 300 fees
+            await feesFromAccount2.transfer(owner.address, 3000n); // 300 fees
             expect(await fees.getCollectedFees()).to.equal(initialFees + 500n); // Total: 200 + 300
 
             // Execute proposal
-            await fees.connect(account1).executeProposal(0);
+            await feesFromAccount1.executeProposal(0);
             expect(await fees.getCollectedFees()).to.equal(initialFees); // 500 - 500 = 0 fees remaining
 
             // Verify final balances
@@ -478,7 +482,7 @@ describe("Fees System", function () {
     // --------------------------------- Fee Percentage Updates
     describe("Fee Percentage Updates", function () {
         it("Should allow owner to update percentage fees to 0%", async function () {
-            const { fees, owner, account1, account2 } = await loadFixture(deployFeesFixture);
+            const { fees, account1, account2 } = await loadFixture(deployFeesFixture);
             // Connect to the contract as account1
             const feesFromAccount1 = await fees.connect(account1);
             // Give account1 some tokens to work with
@@ -502,7 +506,7 @@ describe("Fees System", function () {
         });
 
         it("Should allow owner to update percentage fees to 5%", async function () {
-            const { fees, owner, account1, account2 } = await loadFixture(deployFeesFixture);
+            const { fees, account1, account2 } = await loadFixture(deployFeesFixture);
             // Connect to the contract as account1
             const feesFromAccount1 = await fees.connect(account1);
             // Give account1 some tokens to work with
@@ -526,7 +530,7 @@ describe("Fees System", function () {
         });
 
         it("Should allow owner to update percentage fees to 20%", async function () {
-            const { fees, owner, account1, account2 } = await loadFixture(deployFeesFixture);
+            const { fees, account1, account2 } = await loadFixture(deployFeesFixture);
             // Connect to the contract as account1
             const feesFromAccount1 = await fees.connect(account1);
             // Give account1 some tokens to work with
@@ -550,7 +554,7 @@ describe("Fees System", function () {
         });
 
         it("Should allow owner to update percentage fees to 100%", async function () {
-            const { fees, owner, account1, account2 } = await loadFixture(deployFeesFixture);
+            const { fees, account1, account2 } = await loadFixture(deployFeesFixture);
             // Connect to the contract as account1
             const feesFromAccount1 = await fees.connect(account1);
             // Give account1 some tokens to work with
@@ -582,7 +586,7 @@ describe("Fees System", function () {
         });
 
         it("Should prevent setting percentage fees above 100%", async function () {
-            const { fees, owner } = await loadFixture(deployFeesFixture);
+            const { fees } = await loadFixture(deployFeesFixture);
 
             // Should not allow fees above 100%
             await expect(fees.updatePercentageFees(101))
@@ -590,7 +594,7 @@ describe("Fees System", function () {
         });
 
         it("Should handle multiple fee percentage updates", async function () {
-            const { fees, owner, account1, account2 } = await loadFixture(deployFeesFixture);
+            const { fees, account1, account2 } = await loadFixture(deployFeesFixture);
             // Connect to the contract as account1
             const feesFromAccount1 = await fees.connect(account1);
             // Give account1 some tokens to work with
@@ -625,7 +629,7 @@ describe("Fees System", function () {
         });
 
         it("Should handle fee percentage updates with transferFrom", async function () {
-            const { fees, owner, account1, account2, account3 } = await loadFixture(deployFeesFixture);
+            const { fees, account1, account2, account3 } = await loadFixture(deployFeesFixture);
             // Connect to the contract as account1 and account2
             const feesFromAccount1 = await fees.connect(account1);
             const feesFromAccount2 = await fees.connect(account2);
@@ -671,7 +675,7 @@ describe("Fees System", function () {
         });
 
         it("Should handle edge case with 1% fees", async function () {
-            const { fees, owner, account1, account2 } = await loadFixture(deployFeesFixture);
+            const { fees, account1, account2 } = await loadFixture(deployFeesFixture);
             // Connect to the contract as account1
             const feesFromAccount1 = await fees.connect(account1);
             // Give account1 some tokens to work with
@@ -708,7 +712,7 @@ describe("Fees System", function () {
     describe("Security and Edge Cases", function () {
 
         it("Should handle fee calculation without overflow", async function () {
-            const { fees, owner, account1, account2 } = await loadFixture(deployFeesFixture);
+            const { fees, account1, account2 } = await loadFixture(deployFeesFixture);
             // Connect to the contract as account1
             const feesFromAccount1 = await fees.connect(account1);
             // Set fees to 10%
@@ -780,7 +784,7 @@ describe("Fees System", function () {
         });
 
         it("Should handle fee calculation with very large amounts", async function () {
-            const { fees, owner, account1, account2 } = await loadFixture(deployFeesFixture);
+            const { fees, account1, account2 } = await loadFixture(deployFeesFixture);
             // Connect to the contract as account1
             const feesFromAccount1 = await fees.connect(account1);
             // Set fees to 50%
@@ -872,7 +876,7 @@ describe("Fees System", function () {
         });
 
         it("Should handle multiple fee percentage changes in sequence", async function () {
-            const { fees, owner, account1, account2 } = await loadFixture(deployFeesFixture);
+            const { fees, account1, account2 } = await loadFixture(deployFeesFixture);
             // Connect to the contract as account1
             const feesFromAccount1 = await fees.connect(account1);
             // Give account1 enough tokens for multiple transfers
@@ -904,7 +908,7 @@ describe("Fees System", function () {
         });
 
         it("Should handle fee calculation with very small amounts", async function () {
-            const { fees, owner, account1, account2 } = await loadFixture(deployFeesFixture);
+            const { fees, account1, account2 } = await loadFixture(deployFeesFixture);
             // Connect to the contract as account1
             const feesFromAccount1 = await fees.connect(account1);
             // Give account1 some tokens
@@ -953,7 +957,7 @@ describe("Fees System", function () {
         });
 
         it("Should handle fee calculation with different percentages on small amounts", async function () {
-            const { fees, owner, account1, account2 } = await loadFixture(deployFeesFixture);
+            const { fees, account1, account2 } = await loadFixture(deployFeesFixture);
             // Connect to the contract as account1
             const feesFromAccount1 = await fees.connect(account1);
             // Give account1 some tokens
@@ -1007,7 +1011,7 @@ describe("Fees System", function () {
         });
 
         it("Should prevent double spending of fees", async function () {
-            const { fees, owner, account1, account2 } = await loadFixture(deployFeesFixture);
+            const { fees, account1, account2 } = await loadFixture(deployFeesFixture);
             const feesFromAccount1 = await fees.connect(account1);
             const feesFromAccount2 = await fees.connect(account2);
 
@@ -1040,7 +1044,7 @@ describe("Fees System", function () {
         });
 
         it("Should handle proposal with maximum uint256 value", async function () {
-            const { fees, owner, account1 } = await loadFixture(deployFeesFixture);
+            const { fees, account1 } = await loadFixture(deployFeesFixture);
             const feesFromAccount1 = await fees.connect(account1);
             // Add account1 as admin
             await fees.addAdmin(account1.address);
@@ -1055,7 +1059,7 @@ describe("Fees System", function () {
         });
 
         it("Should handle fee calculation edge cases", async function () {
-            const { fees, owner, account1, account2 } = await loadFixture(deployFeesFixture);
+            const { fees, account1, account2 } = await loadFixture(deployFeesFixture);
             // Connect to the contract as account1
             const feesFromAccount1 = await fees.connect(account1);
             // Give account1 some tokens
@@ -1075,7 +1079,7 @@ describe("Fees System", function () {
         });
 
         it("Should handle proposal execution with zero fees", async function () {
-            const { fees, owner, account1 } = await loadFixture(deployFeesFixture);
+            const { fees, account1 } = await loadFixture(deployFeesFixture);
             // Add account1 as admin
             await fees.addAdmin(account1.address);
 
@@ -1085,7 +1089,7 @@ describe("Fees System", function () {
         });
 
         it("Should handle optimized operations correctly", async function () {
-            const { fees, owner, account1, account2 } = await loadFixture(deployFeesFixture);
+            const { fees, account1, account2 } = await loadFixture(deployFeesFixture);
             const feesFromAccount1 = await fees.connect(account1);
             const feesFromAccount2 = await fees.connect(account2);
 

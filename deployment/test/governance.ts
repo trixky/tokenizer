@@ -21,7 +21,7 @@ describe("Governance", function () {
     // --------------------------------- Admin Management
     describe("Admin Management", function () {
         it("Should allow owner to add admin", async function () {
-            const { fees, owner, account1 } = await loadFixture(deployFeesFixture);
+            const { fees, account1 } = await loadFixture(deployFeesFixture);
             // Add account1 as an admin
             await fees.addAdmin(account1.address);
             // Test that account1 can now propose (which requires admin privileges)
@@ -31,7 +31,7 @@ describe("Governance", function () {
         });
 
         it("Should allow owner to remove admin", async function () {
-            const { fees, owner, account1 } = await loadFixture(deployFeesFixture);
+            const { fees, account1 } = await loadFixture(deployFeesFixture);
             // Add account1 as an admin first
             await fees.addAdmin(account1.address);
             // Verify that account1 is recognized as an admin
@@ -55,7 +55,7 @@ describe("Governance", function () {
         });
 
         it("Should not allow non-owner to remove admin", async function () {
-            const { fees, owner, account1, account2 } = await loadFixture(deployFeesFixture);
+            const { fees, account1, account2 } = await loadFixture(deployFeesFixture);
             // Add account1 as admin first
             await fees.addAdmin(account1.address);
             // Try to remove account1 as admin from account2 (non-owner)
@@ -100,7 +100,7 @@ describe("Governance", function () {
     // --------------------------------- Proposals
     describe("Proposals", function () {
         it("Should allow admin to create proposal", async function () {
-            const { fees, owner, account1 } = await loadFixture(deployFeesFixture);
+            const { fees, account1 } = await loadFixture(deployFeesFixture);
             // Add account1 as admin so it can create proposals
             await fees.addAdmin(account1.address);
             // Create a proposal and verify it emits the correct event
@@ -123,7 +123,7 @@ describe("Governance", function () {
         });
 
         it("Should not allow proposal with minimum signatures higher than global minimum", async function () {
-            const { fees, owner, account1 } = await loadFixture(deployFeesFixture);
+            const { fees, account1 } = await loadFixture(deployFeesFixture);
             // Add account1 as admin so it can create proposals
             await fees.addAdmin(account1.address);
             // Try to create a proposal with minimum signatures higher than global minimum
@@ -135,7 +135,7 @@ describe("Governance", function () {
         });
 
         it("Should not allow proposal with minimum signatures of 0", async function () {
-            const { fees, owner, account1 } = await loadFixture(deployFeesFixture);
+            const { fees, account1 } = await loadFixture(deployFeesFixture);
             // Add account1 as admin so it can create proposals
             await fees.addAdmin(account1.address);
             // Try to create a proposal with minimum signatures of 0 (should fail)
@@ -147,7 +147,7 @@ describe("Governance", function () {
     // --------------------------------- Proposal Signing
     describe("Proposal Signing", function () {
         it("Should allow admin to sign proposal", async function () {
-            const { fees, owner, account1 } = await loadFixture(deployFeesFixture);
+            const { fees, account1 } = await loadFixture(deployFeesFixture);
             // Add account1 as admin so it can create and sign proposals
             await fees.addAdmin(account1);
             // Create a proposal
@@ -161,7 +161,7 @@ describe("Governance", function () {
         });
 
         it("Should not allow non-admin to sign proposal", async function () {
-            const { fees, owner, account1, account2 } = await loadFixture(deployFeesFixture);
+            const { fees, account1, account2 } = await loadFixture(deployFeesFixture);
             // Add account1 as admin so it can create proposals
             await fees.addAdmin(account1);
             // Create a proposal
@@ -174,7 +174,7 @@ describe("Governance", function () {
         });
 
         it("Should not allow signing already signed proposal", async function () {
-            const { fees, owner, account1 } = await loadFixture(deployFeesFixture);
+            const { fees, account1 } = await loadFixture(deployFeesFixture);
             // Add account1 as admin so it can create and sign proposals
             await fees.addAdmin(account1);
             // Create a proposal
@@ -208,7 +208,7 @@ describe("Governance", function () {
         });
 
         it("Should not allow signing cancelled proposal", async function () {
-            const { fees, owner, account1 } = await loadFixture(deployFeesFixture);
+            const { fees, account1 } = await loadFixture(deployFeesFixture);
             // Add account1 as admin so it can create and cancel proposals
             await fees.addAdmin(account1);
             // Create a proposal
@@ -253,7 +253,7 @@ describe("Governance", function () {
         });
 
         it("Should not allow non-admin to execute proposal", async function () {
-            const { fees, owner, account1, account2 } = await loadFixture(deployFeesFixture);
+            const { fees, account1, account2 } = await loadFixture(deployFeesFixture);
             // Add account1 as admin so it can create proposals
             await fees.addAdmin(account1);
             // Create a proposal
@@ -268,7 +268,7 @@ describe("Governance", function () {
         });
 
         it("Should not allow executing proposal without enough signatures", async function () {
-            const { fees, owner, account1 } = await loadFixture(deployFeesFixture);
+            const { fees, account1 } = await loadFixture(deployFeesFixture);
             // Add account1 as admin so it can create proposals
             await fees.addAdmin(account1);
             // Set minimum signatures to 2
@@ -285,7 +285,7 @@ describe("Governance", function () {
         });
 
         it("Should not allow executing proposal without enough fees", async function () {
-            const { fees, owner, account1 } = await loadFixture(deployFeesFixture);
+            const { fees, account1 } = await loadFixture(deployFeesFixture);
             // Add account1 as admin so it can create proposals
             await fees.addAdmin(account1);
             // Create a proposal for 1000 tokens (more than available fees)
@@ -319,7 +319,7 @@ describe("Governance", function () {
         });
 
         it("Should not allow executing cancelled proposal", async function () {
-            const { fees, owner, account1 } = await loadFixture(deployFeesFixture);
+            const { fees, account1 } = await loadFixture(deployFeesFixture);
             // Add account1 as admin so it can create and cancel proposals
             await fees.addAdmin(account1);
             // Create a proposal
@@ -337,7 +337,7 @@ describe("Governance", function () {
     // --------------------------------- Proposal Cancellation
     describe("Proposal Cancellation", function () {
         it("Should allow admin to cancel proposal", async function () {
-            const { fees, owner, account1 } = await loadFixture(deployFeesFixture);
+            const { fees, account1 } = await loadFixture(deployFeesFixture);
             // Add account1 as admin so it can create and cancel proposals
             await fees.addAdmin(account1);
             // Create a proposal
@@ -351,7 +351,7 @@ describe("Governance", function () {
         });
 
         it("Should not allow non-admin to cancel proposal", async function () {
-            const { fees, owner, account1, account2 } = await loadFixture(deployFeesFixture);
+            const { fees, account1, account2 } = await loadFixture(deployFeesFixture);
             // Add account1 as admin so it can create proposals
             await fees.addAdmin(account1);
             // Create a proposal
@@ -383,7 +383,7 @@ describe("Governance", function () {
         });
 
         it("Should not allow cancelling already cancelled proposal", async function () {
-            const { fees, owner, account1 } = await loadFixture(deployFeesFixture);
+            const { fees, account1 } = await loadFixture(deployFeesFixture);
             // Add account1 as admin so it can create and cancel proposals
             await fees.addAdmin(account1);
             // Create a proposal
@@ -427,7 +427,7 @@ describe("Governance", function () {
         });
 
         it("Should allow any admin to cancel", async function () {
-            const { fees, owner, account1, account2 } = await loadFixture(deployFeesFixture);
+            const { fees, account1, account2 } = await loadFixture(deployFeesFixture);
             // Add both accounts as admins
             await fees.addAdmin(account1.address);
             await fees.addAdmin(account2.address);
@@ -475,7 +475,7 @@ describe("Governance", function () {
         });
 
         it("Should prevent admin from signing the same proposal twice", async function () {
-            const { fees, owner, account1, account2 } = await loadFixture(deployFeesFixture);
+            const { fees, account1, account2 } = await loadFixture(deployFeesFixture);
             // Add both accounts as admins
             await fees.addAdmin(account1.address);
             await fees.addAdmin(account2.address);
@@ -544,7 +544,7 @@ describe("Governance", function () {
         });
 
         it("Should prevent non-owner from removing admin", async function () {
-            const { fees, owner, account1, account2 } = await loadFixture(deployFeesFixture);
+            const { fees, account1, account2 } = await loadFixture(deployFeesFixture);
             // Add account1 as admin
             await fees.addAdmin(account1.address);
             // Try to remove account1 as admin from account2 (non-owner)
@@ -558,7 +558,7 @@ describe("Governance", function () {
     // --------------------------------- Edge Cases and Security
     describe("Edge Cases and Security", function () {
         it("Should handle proposal with zero value", async function () {
-            const { fees, owner, account1 } = await loadFixture(deployFeesFixture);
+            const { fees, account1 } = await loadFixture(deployFeesFixture);
             // Add account1 as admin
             await fees.addAdmin(account1.address);
             // Create a proposal for 0 tokens should fail
@@ -567,7 +567,7 @@ describe("Governance", function () {
         });
 
         it("Should handle proposal with maximum uint256 value", async function () {
-            const { fees, owner, account1 } = await loadFixture(deployFeesFixture);
+            const { fees, account1 } = await loadFixture(deployFeesFixture);
             // Add account1 as admin
             await fees.addAdmin(account1.address);
             const maxValue = 2n ** 256n - 1n;
@@ -606,7 +606,7 @@ describe("Governance", function () {
         });
 
         it("Should prevent proposal execution with insufficient fees", async function () {
-            const { fees, owner, account1 } = await loadFixture(deployFeesFixture);
+            const { fees, account1 } = await loadFixture(deployFeesFixture);
             // Add account1 as admin
             await fees.addAdmin(account1.address);
             // Create a proposal for more fees than available
@@ -619,7 +619,7 @@ describe("Governance", function () {
         });
 
         it("Should handle proposal cancellation after signing", async function () {
-            const { fees, owner, account1, account2 } = await loadFixture(deployFeesFixture);
+            const { fees, account1, account2 } = await loadFixture(deployFeesFixture);
             // Add both accounts as admins
             await fees.addAdmin(account1.address);
             await fees.addAdmin(account2.address);
@@ -656,7 +656,7 @@ describe("Governance", function () {
     // --------------------------------- Open Proposals Management
     describe("Open Proposals Management", function () {
         it("Should add proposal to open proposals when created", async function () {
-            const { fees, owner, account1 } = await loadFixture(deployFeesFixture);
+            const { fees, account1 } = await loadFixture(deployFeesFixture);
             // Add account1 as admin
             await fees.addAdmin(account1.address);
             // Create a proposal
@@ -687,7 +687,7 @@ describe("Governance", function () {
         });
 
         it("Should remove proposal from open proposals when cancelled", async function () {
-            const { fees, owner, account1 } = await loadFixture(deployFeesFixture);
+            const { fees, account1 } = await loadFixture(deployFeesFixture);
             // Add account1 as admin
             await fees.addAdmin(account1.address);
             // Create a proposal
@@ -701,7 +701,7 @@ describe("Governance", function () {
         });
 
         it("Should handle multiple open proposals correctly", async function () {
-            const { fees, owner, account1 } = await loadFixture(deployFeesFixture);
+            const { fees, account1 } = await loadFixture(deployFeesFixture);
             // Add account1 as admin
             await fees.addAdmin(account1.address);
             // Create multiple proposals
@@ -743,7 +743,7 @@ describe("Governance", function () {
         });
 
         it("Should handle removal of last proposal correctly", async function () {
-            const { fees, owner, account1 } = await loadFixture(deployFeesFixture);
+            const { fees, account1 } = await loadFixture(deployFeesFixture);
             // Add account1 as admin
             await fees.addAdmin(account1.address);
             // Create two proposals
@@ -759,7 +759,7 @@ describe("Governance", function () {
         });
 
         it("Should handle removal of first proposal correctly", async function () {
-            const { fees, owner, account1 } = await loadFixture(deployFeesFixture);
+            const { fees, account1 } = await loadFixture(deployFeesFixture);
             // Add account1 as admin
             await fees.addAdmin(account1.address);
             // Create two proposals
@@ -808,7 +808,7 @@ describe("Governance", function () {
         });
 
         it("Should handle removal of non-existent proposal gracefully", async function () {
-            const { fees, owner, account1 } = await loadFixture(deployFeesFixture);
+            const { fees, account1 } = await loadFixture(deployFeesFixture);
             // Add account1 as admin
             await fees.addAdmin(account1.address);
             // Create one proposal
@@ -822,7 +822,7 @@ describe("Governance", function () {
         });
 
         it("Should maintain correct order after multiple operations", async function () {
-            const { fees, owner, account1 } = await loadFixture(deployFeesFixture);
+            const { fees, account1 } = await loadFixture(deployFeesFixture);
             // Add account1 as admin
             await fees.addAdmin(account1.address);
             // Create three proposals
@@ -849,7 +849,7 @@ describe("Governance", function () {
     // --------------------------------- Proposal Retrieval
     describe("Proposal Retrieval", function () {
         it("Should return correct proposal data for new proposal", async function () {
-            const { fees, owner, account1 } = await loadFixture(deployFeesFixture);
+            const { fees, account1 } = await loadFixture(deployFeesFixture);
             // Add account1 as admin
             await fees.addAdmin(account1.address);
             // Create a proposal
@@ -867,7 +867,7 @@ describe("Governance", function () {
         });
 
         it("Should return correct proposal data after signing", async function () {
-            const { fees, owner, account1 } = await loadFixture(deployFeesFixture);
+            const { fees, account1 } = await loadFixture(deployFeesFixture);
             // Add account1 as admin
             await fees.addAdmin(account1.address);
             // Create a proposal
@@ -911,7 +911,7 @@ describe("Governance", function () {
         });
 
         it("Should return correct proposal data after cancellation", async function () {
-            const { fees, owner, account1 } = await loadFixture(deployFeesFixture);
+            const { fees, account1 } = await loadFixture(deployFeesFixture);
             // Add account1 as admin
             await fees.addAdmin(account1.address);
             // Create a proposal
@@ -1031,7 +1031,7 @@ describe("Governance", function () {
     // --------------------------------- Additional Getter Functions
     describe("Additional Getter Functions", function () {
         it("Should return correct proposals count", async function () {
-            const { fees, owner, account1 } = await loadFixture(deployFeesFixture);
+            const { fees, account1 } = await loadFixture(deployFeesFixture);
             // Add account1 as admin
             await fees.addAdmin(account1.address);
             // Initially no proposals
@@ -1045,7 +1045,7 @@ describe("Governance", function () {
         });
 
         it("Should return correct signature status", async function () {
-            const { fees, owner, account1, account2 } = await loadFixture(deployFeesFixture);
+            const { fees, account1, account2 } = await loadFixture(deployFeesFixture);
             // Add both accounts as admins
             await fees.addAdmin(account1.address);
             await fees.addAdmin(account2.address);
@@ -1065,7 +1065,7 @@ describe("Governance", function () {
         });
 
         it("Should return correct signature status for non-admin", async function () {
-            const { fees, owner, account1, account2 } = await loadFixture(deployFeesFixture);
+            const { fees, account1, account2 } = await loadFixture(deployFeesFixture);
             // Add only account1 as admin
             await fees.addAdmin(account1.address);
             // Create a proposal
@@ -1075,7 +1075,7 @@ describe("Governance", function () {
         });
 
         it("Should return correct signature status for non-existent proposal", async function () {
-            const { fees, owner, account1 } = await loadFixture(deployFeesFixture);
+            const { fees, account1 } = await loadFixture(deployFeesFixture);
             // Check signature status for non-existent proposal
             expect(await fees.hasSignedProposal(999, account1.address)).to.equal(false);
         });
@@ -1145,7 +1145,7 @@ describe("Governance", function () {
         });
 
         it("Should return single proposal correctly", async function () {
-            const { fees, owner, account1 } = await loadFixture(deployFeesFixture);
+            const { fees, account1 } = await loadFixture(deployFeesFixture);
             // Add account1 as admin
             await fees.addAdmin(account1.address);
             // Create single proposal
@@ -1215,7 +1215,7 @@ describe("Governance", function () {
         });
 
         it("Should handle multiple signatures correctly in hasSignedProposal", async function () {
-            const { fees, owner, account1, account2, account3 } = await loadFixture(deployFeesFixture);
+            const { fees, account1, account2, account3 } = await loadFixture(deployFeesFixture);
             // Add all three accounts as admins
             await fees.addAdmin(account1.address);
             await fees.addAdmin(account2.address);
@@ -1250,7 +1250,7 @@ describe("Governance", function () {
         });
 
         it("Should return empty array for getProposalSignatures when no signatures", async function () {
-            const { fees, owner, account1 } = await loadFixture(deployFeesFixture);
+            const { fees, account1 } = await loadFixture(deployFeesFixture);
             // Add account1 as admin
             await fees.addAdmin(account1.address);
             // Create a proposal
@@ -1261,7 +1261,7 @@ describe("Governance", function () {
         });
 
         it("Should return correct signatures for getProposalSignatures with one signature", async function () {
-            const { fees, owner, account1 } = await loadFixture(deployFeesFixture);
+            const { fees, account1 } = await loadFixture(deployFeesFixture);
             // Add account1 as admin
             await fees.addAdmin(account1.address);
             // Create a proposal
@@ -1275,7 +1275,7 @@ describe("Governance", function () {
         });
 
         it("Should return correct signatures for getProposalSignatures with multiple signatures", async function () {
-            const { fees, owner, account1, account2, account3 } = await loadFixture(deployFeesFixture);
+            const { fees, account1, account2, account3 } = await loadFixture(deployFeesFixture);
             // Add all accounts as admins
             await fees.addAdmin(account1.address);
             await fees.addAdmin(account2.address);
@@ -1297,7 +1297,7 @@ describe("Governance", function () {
         });
 
         it("Should return correct signatures order for getProposalSignatures", async function () {
-            const { fees, owner, account1, account2 } = await loadFixture(deployFeesFixture);
+            const { fees, account1, account2 } = await loadFixture(deployFeesFixture);
             // Add both accounts as admins
             await fees.addAdmin(account1.address);
             await fees.addAdmin(account2.address);
@@ -1343,7 +1343,7 @@ describe("Governance", function () {
         });
 
         it("Should return correct signatures after proposal cancellation", async function () {
-            const { fees, owner, account1, account2 } = await loadFixture(deployFeesFixture);
+            const { fees, account1, account2 } = await loadFixture(deployFeesFixture);
             // Add both accounts as admins
             await fees.addAdmin(account1.address);
             await fees.addAdmin(account2.address);
@@ -1362,7 +1362,7 @@ describe("Governance", function () {
         });
 
         it("Should return correct signatures for multiple proposals", async function () {
-            const { fees, owner, account1, account2 } = await loadFixture(deployFeesFixture);
+            const { fees, account1, account2 } = await loadFixture(deployFeesFixture);
             // Add both accounts as admins
             await fees.addAdmin(account1.address);
             await fees.addAdmin(account2.address);
