@@ -15,6 +15,10 @@ error InsufficientFees(uint256 proposalId);
 error MinimumSignaturesTooHigh(uint8 minimumSignatures);
 error PercentageFeesTooHigh(uint256 percentageFees);
 error FeeCalculationOverflow(uint256 value, uint256 percentageFees);
+error CannotAddZeroAddressAsAdmin();
+error CannotRemoveZeroAddress();
+error CannotProposeToZeroAddress();
+error CannotProposeWithZeroValue();
 
 event ProposalCreated(uint256 proposalId, address to, uint256 value, uint8 minimumSignatures);
 event ProposalSigned(uint256 proposalId, address admin);
@@ -92,10 +96,16 @@ contract TokenWithFees is ERC20 {
     }
 
     function addAdmin(address admin) external onlyOwner {
+        if (admin == address(0)) {
+            revert CannotAddZeroAddressAsAdmin();
+        }
         _admins[admin] = true;
     }
 
     function removeAdmin(address admin) external onlyOwner {
+        if (admin == address(0)) {
+            revert CannotRemoveZeroAddress();
+        }
         _admins[admin] = false;
     }
 
@@ -159,10 +169,10 @@ contract TokenWithFees is ERC20 {
             if (fees > _balances[addr]) {
                 revert ERC20InsufficientBalance(addr, _balances[addr], fees);
             }
-            unchecked {
-                _balances[addr] -= fees;
-                _collectedFees += fees;
-            }
+            
+            // Safe arithmetic operations with explicit checks
+            _balances[addr] -= fees;
+            _collectedFees += fees;
         }
     }
 
@@ -260,6 +270,12 @@ contract TokenWithFees is ERC20 {
     }
 
     function proposeCollection(address to, uint256 value, uint8 minimumSignatures) external onlyAdmin {
+        if (to == address(0)) {
+            revert CannotProposeToZeroAddress();
+        }
+        if (value == 0) {
+            revert CannotProposeWithZeroValue();
+        }
         if (minimumSignatures < 1) {
             // if the minimum signatures is less than 1
             revert MinimumSignaturesTooLow(minimumSignatures);

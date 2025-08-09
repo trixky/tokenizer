@@ -360,20 +360,9 @@ describe("Fees System", function () {
             // Add account1 as admin so it can create proposals
             await fees.addAdmin(account1);
 
-            // Create a proposal for 0 tokens
-            await fees.connect(account1).proposeCollection(account1.address, 0n, MINIMUM_SIGNATURES);
-            // Sign the proposal
-            await fees.connect(account1).signProposal(0);
-
-            // Record the initial collected fees amount
-            const initialFees = await fees.getCollectedFees();
-
-            // Should be able to execute even with 0 fees
-            await fees.connect(account1).executeProposal(0);
-            // Verify account1 balance unchanged (no tokens transferred)
-            expect(await fees.balanceOf(account1.address)).to.equal(0n);
-            // Verify that no fees were collected or consumed
-            expect(await fees.getCollectedFees()).to.equal(initialFees); // No fees collected or consumed
+            // Create a proposal for 0 tokens should fail
+            await expect(fees.connect(account1).proposeCollection(account1.address, 0n, MINIMUM_SIGNATURES))
+                .to.be.revertedWithCustomError(fees, "CannotProposeWithZeroValue");
         });
     });
 
@@ -991,64 +980,77 @@ describe("Fees System", function () {
 
         it("Should handle proposal execution with exact fee balance", async function () {
             const { fees, owner, account1 } = await loadFixture(deployFeesFixture);
+            const feesFromAccount1 = await fees.connect(account1);
             // Add account1 as admin
             await fees.addAdmin(account1.address);
 
+            // Generate some fees first
+            await fees.transfer(account1.address, 1000n); // 1000 tokens
+            expect(await fees.balanceOf(account1.address)).to.equal(1000n); // 1000 + 100 fees
+
+            await feesFromAccount1.transfer(owner.address, 100n); // Generates 10 fees
+            expect(await fees.balanceOf(account1.address)).to.equal(890n); // 1000 - 100 - 10 fees
+
             // Create a proposal for exactly the available fees
             const availableFees = await fees.getCollectedFees();
-            await fees.connect(account1).proposeCollection(account1.address, availableFees, MINIMUM_SIGNATURES);
-            await fees.connect(account1).signProposal(0);
+            expect(availableFees).to.be.equal(110n); // Make sure we have fees
+            await feesFromAccount1.proposeCollection(account1.address, availableFees, MINIMUM_SIGNATURES);
+            await feesFromAccount1.signProposal(0);
 
             // Execute the proposal
-            await fees.connect(account1).executeProposal(0);
+            await feesFromAccount1.executeProposal(0);
 
             // Verify that all fees were consumed
             expect(await fees.getCollectedFees()).to.equal(0n);
             // Verify that account1 received the fees
-            expect(await fees.balanceOf(account1.address)).to.equal(availableFees);
+            expect(await fees.balanceOf(account1.address)).to.equal(890n + availableFees);
         });
 
         it("Should prevent double spending of fees", async function () {
             const { fees, owner, account1, account2 } = await loadFixture(deployFeesFixture);
+            const feesFromAccount1 = await fees.connect(account1);
+            const feesFromAccount2 = await fees.connect(account2);
+
             // Add both accounts as admins
             await fees.addAdmin(account1.address);
             await fees.addAdmin(account2.address);
 
             // Generate some fees
             await fees.transfer(account1.address, 1000n);
-            await fees.connect(account1).transfer(account2.address, 100n); // Generates 10 fees
+            await feesFromAccount1.transfer(account2.address, 100n); // Generates 10 fees
 
             const availableFees = await fees.getCollectedFees();
             expect(availableFees).to.be.gt(0n);
 
             // Create two proposals for the same amount of fees
-            await fees.connect(account1).proposeCollection(account1.address, availableFees, MINIMUM_SIGNATURES);
-            await fees.connect(account2).proposeCollection(account2.address, availableFees, MINIMUM_SIGNATURES);
+            await feesFromAccount1.proposeCollection(account1.address, availableFees, MINIMUM_SIGNATURES);
+            await feesFromAccount2.proposeCollection(account2.address, availableFees, MINIMUM_SIGNATURES);
 
             // Sign both proposals
-            await fees.connect(account1).signProposal(0);
-            await fees.connect(account2).signProposal(1);
+            await feesFromAccount1.signProposal(0);
+            await feesFromAccount2.signProposal(1);
 
             // Execute first proposal
-            await fees.connect(account1).executeProposal(0);
+            await feesFromAccount1.executeProposal(0);
             expect(await fees.getCollectedFees()).to.equal(0n);
 
             // Try to execute second proposal (should fail due to insufficient fees)
-            await expect(fees.connect(account2).executeProposal(1))
+            await expect(feesFromAccount2.executeProposal(1))
                 .to.be.revertedWithCustomError(fees, "InsufficientFees");
         });
 
         it("Should handle proposal with maximum uint256 value", async function () {
             const { fees, owner, account1 } = await loadFixture(deployFeesFixture);
+            const feesFromAccount1 = await fees.connect(account1);
             // Add account1 as admin
             await fees.addAdmin(account1.address);
             const maxValue = 2n ** 256n - 1n;
             // Create a proposal with maximum value
-            await fees.connect(account1).proposeCollection(account1.address, maxValue, MINIMUM_SIGNATURES);
+            await feesFromAccount1.proposeCollection(account1.address, maxValue, MINIMUM_SIGNATURES);
             // Sign the proposal
-            await fees.connect(account1).signProposal(0);
+            await feesFromAccount1.signProposal(0);
             // Try to execute the proposal (should fail due to insufficient fees)
-            await expect(fees.connect(account1).executeProposal(0))
+            await expect(feesFromAccount1.executeProposal(0))
                 .to.be.revertedWithCustomError(fees, "InsufficientFees");
         });
 
@@ -1077,41 +1079,39 @@ describe("Fees System", function () {
             // Add account1 as admin
             await fees.addAdmin(account1.address);
 
-            // Create a proposal for 0 tokens
-            await fees.connect(account1).proposeCollection(account1.address, 0n, MINIMUM_SIGNATURES);
-            // Sign the proposal
-            await fees.connect(account1).signProposal(0);
-            // Execute the proposal (should succeed even with 0 value)
-            await fees.connect(account1).executeProposal(0);
-            // Verify that account1 received 0 tokens
-            expect(await fees.balanceOf(account1.address)).to.equal(0n);
+            // Create a proposal for 0 tokens should fail
+            await expect(fees.connect(account1).proposeCollection(account1.address, 0n, MINIMUM_SIGNATURES))
+                .to.be.revertedWithCustomError(fees, "CannotProposeWithZeroValue");
         });
 
         it("Should handle optimized operations correctly", async function () {
             const { fees, owner, account1, account2 } = await loadFixture(deployFeesFixture);
+            const feesFromAccount1 = await fees.connect(account1);
+            const feesFromAccount2 = await fees.connect(account2);
+
             // Add both accounts as admins
             await fees.addAdmin(account1.address);
             await fees.addAdmin(account2.address);
 
             // Create multiple proposals to test optimized operations
-            await fees.connect(account1).proposeCollection(account1.address, 100n, MINIMUM_SIGNATURES);
-            await fees.connect(account2).proposeCollection(account2.address, 200n, MINIMUM_SIGNATURES);
-            await fees.connect(account1).proposeCollection(account1.address, 300n, MINIMUM_SIGNATURES);
+            await feesFromAccount1.proposeCollection(account1.address, 100n, MINIMUM_SIGNATURES);
+            await feesFromAccount2.proposeCollection(account2.address, 200n, MINIMUM_SIGNATURES);
+            await feesFromAccount1.proposeCollection(account1.address, 300n, MINIMUM_SIGNATURES);
 
             // Sign all proposals
-            await fees.connect(account1).signProposal(0);
-            await fees.connect(account1).signProposal(1);
-            await fees.connect(account2).signProposal(1);
-            await fees.connect(account1).signProposal(2);
+            await feesFromAccount1.signProposal(0);
+            await feesFromAccount1.signProposal(1);
+            await feesFromAccount2.signProposal(1);
+            await feesFromAccount1.signProposal(2);
 
             // Generate fees
             await fees.transfer(account1.address, 10000n);
-            await fees.connect(account1).transfer(account2.address, 1000n);
+            await feesFromAccount1.transfer(account2.address, 1000n);
 
             // Execute proposals to test optimized arithmetic operations
-            await fees.connect(account1).executeProposal(0);
-            await fees.connect(account2).executeProposal(1);
-            await fees.connect(account1).executeProposal(2);
+            await feesFromAccount1.executeProposal(0);
+            await feesFromAccount2.executeProposal(1);
+            await feesFromAccount1.executeProposal(2);
 
             // Verify final balances
             // account1: 10000 - 1000 - 100 fees + 100 (proposal 0) + 300 (proposal 2) = 9300

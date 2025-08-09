@@ -561,14 +561,9 @@ describe("Governance", function () {
             const { fees, owner, account1 } = await loadFixture(deployFeesFixture);
             // Add account1 as admin
             await fees.addAdmin(account1.address);
-            // Create a proposal for 0 tokens
-            await fees.connect(account1).proposeCollection(account1.address, await toInternalUnits(fees, 0n), MINIMUM_SIGNATURES);
-            // Sign the proposal
-            await fees.connect(account1).signProposal(0);
-            // Execute the proposal (should succeed even with 0 value)
-            await fees.connect(account1).executeProposal(0);
-            // Verify that account1 received 0 tokens
-            expect(await fees.balanceOf(account1.address)).to.equal(0n);
+            // Create a proposal for 0 tokens should fail
+            await expect(fees.connect(account1).proposeCollection(account1.address, await toInternalUnits(fees, 0n), MINIMUM_SIGNATURES))
+                .to.be.revertedWithCustomError(fees, "CannotProposeWithZeroValue");
         });
 
         it("Should handle proposal with maximum uint256 value", async function () {
