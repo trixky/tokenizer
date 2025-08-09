@@ -38,7 +38,7 @@ contract TokenWithFees is ERC20 {
         address cancelledBy;
     }
 
-    mapping(uint256 proposalId => mapping(address admin => bool) signatures) private _proposalSignatures;
+    mapping(uint256 proposalId => address[] signatures) private _proposalSignatures;
 
     Proposal[] private _proposals;
     uint256[] private _openProposals; // Array of open proposal indices
@@ -187,7 +187,7 @@ contract TokenWithFees is ERC20 {
         return (
             proposal.signatureCount,
             proposal.to,
-            proposal.value,
+            proposal.value, // Return in internal units (smallest unit)
             proposal.minimumSignatures,
             proposal.executed,
             proposal.cancelledBy
@@ -199,15 +199,17 @@ contract TokenWithFees is ERC20 {
     }
 
     function hasSignedProposal(uint256 proposalId, address admin) external view returns (bool) {
-        return _proposalSignatures[proposalId][admin];
+        address[] memory signatures = _proposalSignatures[proposalId];
+        for (uint256 i = 0; i < signatures.length; i++) {
+            if (signatures[i] == admin) {
+                return true;
+            }
+        }
+        return false;
     }
 
     function getProposalSignatures(uint256 proposalId) external view returns (address[] memory) {
-        // This function would require significant refactoring to implement properly
-        // since we only store boolean flags for signatures, not the actual signer addresses
-        // For now, return an empty array
-        // In a real implementation, you might want to store signer addresses directly
-        return new address[](0);
+        return _proposalSignatures[proposalId];
     }
 
     function getAllProposals() external view returns (
@@ -230,7 +232,7 @@ contract TokenWithFees is ERC20 {
             Proposal memory proposal = _proposals[i];
             proposalIds[i] = i;
             recipients[i] = proposal.to;
-            values[i] = proposal.value;
+            values[i] = proposal.value; // Return in internal units (smallest unit)
             minimumSignatures[i] = proposal.minimumSignatures;
             executed[i] = proposal.executed;
             cancelledBy[i] = proposal.cancelledBy;
@@ -299,11 +301,16 @@ contract TokenWithFees is ERC20 {
             // if the proposal has been cancelled
             revert ProposalAlreadyCancelled(proposalId);
         }
-        if (_proposalSignatures[proposalId][msg.sender]) {
-            // if the admin has already signed the proposal
-            revert ProposalAlreadySigned(proposalId, msg.sender);
+        
+        // Check if admin has already signed
+        address[] memory signatures = _proposalSignatures[proposalId];
+        for (uint256 i = 0; i < signatures.length; i++) {
+            if (signatures[i] == msg.sender) {
+                revert ProposalAlreadySigned(proposalId, msg.sender);
+            }
         }
-        _proposalSignatures[proposalId][msg.sender] = true;
+        
+        _proposalSignatures[proposalId].push(msg.sender);
         unchecked {
             _proposals[proposalId].signatureCount++;
         }
